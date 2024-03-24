@@ -15,13 +15,13 @@ class Content:
         self.translation = translation
         self.status = False
 
-    def set_translation(self, translation, status):
-        if not self.check_translation_type(translation):
+    def set_translation(self, translation, status): # 设置翻译后的内容及状态，参数
+        if not self.check_translation_type(translation): # 检查翻译内容的类型是否与原始内容类型匹配
             raise ValueError(f"Invalid translation type. Expected {self.content_type}, but got {type(translation)}")
         self.translation = translation
         self.status = status
 
-    def check_translation_type(self, translation):
+    def check_translation_type(self, translation): # 检查翻译内容的类型是否与原始内容类型匹配。
         if self.content_type == ContentType.TEXT and isinstance(translation, str):
             return True
         elif self.content_type == ContentType.TABLE and isinstance(translation, list):
@@ -29,6 +29,19 @@ class Content:
         elif self.content_type == ContentType.IMAGE and isinstance(translation, PILImage.Image):
             return True
         return False
+
+class ImageContent(Content):
+    def __init__(self, image_list):
+        super().__init__(ContentType.IMAGE, image_list)
+        self.status = True 
+
+    def set_translation(self, translation, status):
+        # For image content, translation will remain the same as original
+        self.translation = self.original
+        self.status = status
+
+    def __str__(self):
+        return "Image Content"
 
 
 class TableContent(Content):
@@ -48,7 +61,7 @@ class TableContent(Content):
 
             LOG.debug(translation)
             # Convert the string to a list of lists
-            table_data = [row.strip().split() for row in translation.strip().split('\n')]
+            table_data = [row.strip().split('|') for row in translation.strip().split('\n')]
             LOG.debug(table_data)
             # Create a DataFrame from the table_data
             translated_df = pd.DataFrame(table_data[1:], columns=table_data[0])
@@ -63,15 +76,15 @@ class TableContent(Content):
     def __str__(self):
         return self.original.to_string(header=False, index=False)
 
-    def iter_items(self, translated=False):
+    def iter_items(self, translated=False): # 迭代表格中的每个元素。如果 translated 参数为 True，则迭代翻译后的内容，否则迭代原始内容。
         target_df = self.translation if translated else self.original
         for row_idx, row in target_df.iterrows():
             for col_idx, item in enumerate(row):
                 yield (row_idx, col_idx, item)
 
-    def update_item(self, row_idx, col_idx, new_value, translated=False):
+    def update_item(self, row_idx, col_idx, new_value, translated=False): # 更新表格中指定位置的元素值。如果 translated 参数为 True，则更新翻译后的内容，否则更新原始内容。
         target_df = self.translation if translated else self.original
         target_df.at[row_idx, col_idx] = new_value
 
-    def get_original_as_str(self):
+    def get_original_as_str(self): # 返回原始表格内容的字符串表示。
         return self.original.to_string(header=False, index=False)
