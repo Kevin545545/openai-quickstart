@@ -1,4 +1,3 @@
-import os
 from reportlab.lib import colors, pagesizes, units
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
@@ -7,6 +6,11 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 )
 
+from reportlab.platypus import Image
+from reportlab.platypus import SimpleDocTemplate, Image, Spacer
+
+
+import tempfile
 from book import Book, ContentType
 from utils import LOG
 
@@ -22,7 +26,7 @@ class Writer:
         else:
             raise ValueError(f"Unsupported file format: {file_format}")
 
-    def _save_translated_book_pdf(self, book: Book, output_file_path: str = None):
+    def _save_translated_book_pdf(self, book: Book, output_file_path: str = None): # 将翻译后的书籍保存为 PDF 格式
         if output_file_path is None:
             output_file_path = book.pdf_file_path.replace('.pdf', f'_translated.pdf')
 
@@ -51,6 +55,28 @@ class Writer:
                         para = Paragraph(text, simsun_style)
                         story.append(para)
 
+                    elif content.content_type == ContentType.IMAGE:
+                        # Add image to the PDF
+                        for img in content.original:
+                            LOG.debug(f"Adding image: {img}")
+                           
+                            try:
+                                if hasattr(img, 'save'):
+                                    # 将图像保存到临时文件
+                                    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
+                                        temp_file_path = temp_file.name
+                                        img.save(temp_file_path)  # 保存图像到临时文件
+                                    # 添加临时文件路径中的图像到story中
+                                    story.append(Image(temp_file_path))
+                                    LOG.debug("Image added successfully.")
+                                else:
+                                    LOG.error("PageImage object does not have 'save' method.")
+
+
+                            except Exception as e:
+                                LOG.error(f"Error adding image: {e}")
+
+
                     elif content.content_type == ContentType.TABLE:
                         # Add table to the PDF
                         table = content.translation
@@ -76,7 +102,7 @@ class Writer:
         doc.build(story)
         LOG.info(f"翻译完成: {output_file_path}")
 
-    def _save_translated_book_markdown(self, book: Book, output_file_path: str = None):
+    def _save_translated_book_markdown(self, book: Book, output_file_path: str = None): # 将翻译后的书籍保存为 Markdown 格式。
         if output_file_path is None:
             output_file_path = book.pdf_file_path.replace('.pdf', f'_translated.md')
 
@@ -91,16 +117,16 @@ class Writer:
                             # Add translated text to the Markdown file
                             text = content.translation
                             output_file.write(text + '\n\n')
-
+                        
                         elif content.content_type == ContentType.TABLE:
                             # Add table to the Markdown file
                             table = content.translation
                             header = '| ' + ' | '.join(str(column) for column in table.columns) + ' |' + '\n'
-                            separator = '| ' + ' | '.join(['---'] * len(table.columns)) + ' |' + '\n'
+                            separator = '| ' +' | '.join(['---'] * len(table.columns)) +  ' |' + '\n' 
                             # body = '\n'.join(['| ' + ' | '.join(row) + ' |' for row in table.values.tolist()]) + '\n\n'
                             body = '\n'.join(['| ' + ' | '.join(str(cell) for cell in row) + ' |' for row in table.values.tolist()]) + '\n\n'
                             output_file.write(header + separator + body)
-
+                        
                 # Add a page break (horizontal rule) after each page except the last one
                 if page != book.pages[-1]:
                     output_file.write('---\n\n')
